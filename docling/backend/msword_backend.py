@@ -162,6 +162,7 @@ class MsWordDocumentBackend(DeclarativeDocumentBackend):
         doc: DoclingDocument,
     ) -> DoclingDocument:
         for element in body:
+            # print("============")
             tag_name = etree.QName(element).localname
             # Check for Inline Images (blip elements)
             namespaces = {
@@ -181,6 +182,8 @@ class MsWordDocumentBackend(DeclarativeDocumentBackend):
 
             elif drawing_blip:
                 self.handle_pictures(docx_obj, drawing_blip, doc)
+                # To fix anchored image on text. Feature from LibraOffice
+                self.handle_text_elements(element, docx_obj, doc)
             # Check for the sdt containers, like table of contents
             elif tag_name in ["sdt"]:
                 sdt_content = element.find(".//w:sdtContent", namespaces=namespaces)
@@ -257,6 +260,27 @@ class MsWordDocumentBackend(DeclarativeDocumentBackend):
                 label_str = parts[1]
                 label_level = self.str_to_int(parts[0], None)
             return label_str, label_level
+        # Handle special lable that is not handled
+        elif "Title" in label and len(parts) == 2:
+            parts.sort()
+            label_str = ""
+            label_level = 0
+            if parts[0] == "Title":
+                label_str = parts[0]
+                label_level = self.str_to_int(parts[1], default=None)
+            if parts[1] == "Title":
+                label_str = parts[1]
+                label_level = self.str_to_int(parts[0], default=None)
+            return label_str, label_level
+        elif label in ["HeaderTitle", "Title"]:
+            return "Title", 0
+        elif label in ["Subtitle"]:
+            return "Title", 1
+        elif label in ["GMTLText", "Text", "TextBody"]:
+            return "Normal", None
+        elif "Contents" in label:
+            match = re.match(r"(Contents)(\d)", label)
+            return "Contents", match[1]
         else:
             return label, None
 
@@ -272,6 +296,10 @@ class MsWordDocumentBackend(DeclarativeDocumentBackend):
             return
         text = paragraph.text.strip()
 
+        # Avoid empty text
+        if text == "":
+            return
+
         # Common styles for bullet and numbered lists.
         # "List Bullet", "List Number", "List Paragraph"
         # Identify wether list is a numbered list or not
@@ -279,6 +307,18 @@ class MsWordDocumentBackend(DeclarativeDocumentBackend):
         is_numbered = False
         p_style_id, p_level = self.get_label_and_level(paragraph)
         numid, ilevel = self.get_numId_and_ilvl(paragraph)
+
+        # Skipping TOC
+        if p_style_id in [
+            "TOC",
+            "TOC1",
+            "TOC2",
+            "TOC3",
+            "Contents"
+        ]:
+            return
+        # else:
+        #     print(f"MsWord: {p_style_id} numid: {numid} ilevel: {ilevel}: {paragraph.text[0:20]}")
 
         if numid == 0:
             numid = None
@@ -326,7 +366,6 @@ class MsWordDocumentBackend(DeclarativeDocumentBackend):
         elif p_style_id in [
             "Paragraph",
             "Normal",
-            "Subtitle",
             "Author",
             "DefaultText",
             "ListParagraph",
@@ -394,6 +433,7 @@ class MsWordDocumentBackend(DeclarativeDocumentBackend):
         level = self.get_level()
         prev_indent = self.prev_indent()
         if self.prev_numid() is None:  # Open new list
+            # print(f"MsWord: First List")
             self.level_at_new_list = level
 
             self.parents[level] = doc.add_group(
@@ -410,6 +450,29 @@ class MsWordDocumentBackend(DeclarativeDocumentBackend):
                 enumerated=is_numbered,
                 parent=self.parents[level],
                 text=text,
+                ilevel=ilevel,
+            )
+
+        # To handle case when numid changed, but it did not start a new list
+        elif (
+            not self.prev_numid() == numid
+        ): # New list
+            # print(f"MsWord: Diff numid")
+            self.level_at_new_list = level
+
+            self.parents[level] = doc.add_group(
+                label=GroupLabel.LIST, name="list", parent=self.parents[level - 1]
+            )
+            self.listIter += 1
+            if is_numbered:
+                enum_marker = str(self.listIter) + "."
+                is_numbered = True
+            doc.add_list_item(
+                marker=enum_marker,
+                enumerated=is_numbered,
+                parent=self.parents[level],
+                text=text,
+                ilevel=ilevel,
             )
 
         elif (
@@ -418,6 +481,7 @@ class MsWordDocumentBackend(DeclarativeDocumentBackend):
             and prev_indent is not None
             and prev_indent < ilevel
         ):  # Open indented list
+            # print(f"MsWord: Indented List")
             for i in range(
                 self.level_at_new_list + prev_indent + 1,
                 self.level_at_new_list + ilevel + 1,
@@ -446,6 +510,7 @@ class MsWordDocumentBackend(DeclarativeDocumentBackend):
                 enumerated=is_numbered,
                 parent=self.parents[self.level_at_new_list + ilevel],
                 text=text,
+                ilevel=ilevel,
             )
 
         elif (
@@ -454,6 +519,7 @@ class MsWordDocumentBackend(DeclarativeDocumentBackend):
             and prev_indent is not None
             and ilevel < prev_indent
         ):  # Close list
+            # print(f"MsWord: Close List")
             for k, v in self.parents.items():
                 if k > self.level_at_new_list + ilevel:
                     self.parents[k] = None
@@ -468,10 +534,12 @@ class MsWordDocumentBackend(DeclarativeDocumentBackend):
                 enumerated=is_numbered,
                 parent=self.parents[self.level_at_new_list + ilevel],
                 text=text,
+                ilevel=ilevel,
             )
             self.listIter = 0
 
         elif self.prev_numid() == numid or prev_indent == ilevel:
+            # print(f"MsWord: Same List")
             # TODO: Set marker and enumerated arguments if this is an enumeration element.
             self.listIter += 1
             if is_numbered:
@@ -482,6 +550,7 @@ class MsWordDocumentBackend(DeclarativeDocumentBackend):
                 enumerated=is_numbered,
                 parent=self.parents[level - 1],
                 text=text,
+                ilevel=ilevel,
             )
         return
 
