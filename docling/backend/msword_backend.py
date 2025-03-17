@@ -629,6 +629,8 @@ class MsWordDocumentBackend(DeclarativeDocumentBackend):
                 # Access the image part using the relationship ID
                 image_part = docx_obj.part.rels[rId].target_part
                 image_data = image_part.blob  # Get the binary image data
+            else:
+                image_data = None
             return image_data
 
         level = self.get_level()
