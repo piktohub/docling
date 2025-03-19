@@ -281,7 +281,10 @@ class MsWordDocumentBackend(DeclarativeDocumentBackend):
             return "Normal", None
         elif "Contents" in label:
             match = re.match(r"(Contents)(\d)", label)
-            return "Contents", match[1]
+            if match:
+                return "Contents", match[1]
+            else:
+                return "Contents", 0
         else:
             return label, None
 
