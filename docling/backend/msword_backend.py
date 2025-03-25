@@ -679,6 +679,9 @@ class MsWordDocumentBackend(DeclarativeDocumentBackend):
                         self.equation_bookends.format(EQ=latex_equation)
                     )
 
+        if not text:
+            return "", []
+
         if len(only_equations) < 1:
             return text, []
 
