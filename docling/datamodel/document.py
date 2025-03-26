@@ -279,10 +279,11 @@ class _DocumentConversionInput(BaseModel):
         formats: list[InputFormat] = []
 
         if isinstance(obj, Path):
-            mime = filetype.guess_mime(str(obj))
+            # Make detect using extention a priority. And mime from obj a lesser priority.
+            ext = obj.suffix[1:]
+            mime = _DocumentConversionInput._mime_from_extension(ext)
             if mime is None:
-                ext = obj.suffix[1:]
-                mime = _DocumentConversionInput._mime_from_extension(ext)
+                mime = filetype.guess_mime(str(obj))
             if mime is None:  # must guess from
                 with obj.open("rb") as f:
                     content = f.read(1024)  # Read first 1KB
