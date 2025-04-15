@@ -942,6 +942,7 @@ class MsWordDocumentBackend(DeclarativeDocumentBackend):
                     text=text,
                     formatting=format,
                     hyperlink=hyperlink,
+                    ilevel=ilevel,
                 )
 
         elif (
@@ -987,6 +988,7 @@ class MsWordDocumentBackend(DeclarativeDocumentBackend):
                     text=text,
                     formatting=format,
                     hyperlink=hyperlink,
+                    ilevel=ilevel,
                 )
         elif (
             self._prev_numid() == numid
@@ -1016,6 +1018,7 @@ class MsWordDocumentBackend(DeclarativeDocumentBackend):
                     text=text,
                     formatting=format,
                     hyperlink=hyperlink,
+                    ilevel=ilevel,
                 )
             self.listIter = 0
 
@@ -1039,6 +1042,7 @@ class MsWordDocumentBackend(DeclarativeDocumentBackend):
                     text=text,
                     formatting=format,
                     hyperlink=hyperlink,
+                    ilevel=ilevel,
                 )
         return
 
