@@ -256,6 +256,8 @@ class MsWordDocumentBackend(DeclarativeDocumentBackend):
 
             elif drawing_blip:
                 self._handle_pictures(docx_obj, drawing_blip, doc)
+                # To fix anchored image on text. Feature from LibraOffice
+                self._handle_text_elements(element, docx_obj, doc)
             # Check for the sdt containers, like table of contents
             elif tag_name in ["sdt"]:
                 sdt_content = element.find(".//w:sdtContent", namespaces=namespaces)
